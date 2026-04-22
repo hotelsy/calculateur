@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculateur Hôtelier - Multidevises</title>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 15px; background-color: #f4f4f4; color: #333; }
+        .container { max-width: 500px; margin: auto; }
+        h2 { color: #0056b3; text-align: center; }
+        .menu-initial { display: flex; flex-direction: column; gap: 15px; margin-top: 50px; }
+        .btn-choice { padding: 25px; font-size: 18px; font-weight: bold; color: white; border: none; border-radius: 12px; cursor: pointer; transition: transform 0.2s; }
+        .btn-dates { background-color: #0056b3; }
+        .btn-nights { background-color: #6c757d; }
+        .btn-choice:hover { transform: scale(1.02); opacity: 0.9; }
+        .hidden { display: none; }
+        label { display: block; margin-top: 15px; font-weight: bold; }
+        input, select, button { width: 100%; padding: 12px; margin-top: 5px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; }
+        
+        .top-buttons { display: flex; gap: 10px; margin-bottom: 15px; }
+        .btn-back { width: auto !important; background-color: #e0e0e0; color: #333; border: 1px solid #ccc; font-weight: bold; padding: 8px 15px; cursor: pointer; border-radius: 6px; flex: 1; }
+        .btn-reset { width: auto !important; background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; font-weight: bold; padding: 8px 15px; cursor: pointer; border-radius: 6px; flex: 1; }
+        
+        .section-box { background: white; padding: 15px; border-radius: 8px; margin-top: 20px; border: 1px solid #ddd; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .chambre-item { background: #fff; padding: 12px; margin-top: 10px; border-radius: 8px; border-left: 5px solid #007bff; display: flex; justify-content: space-between; align-items: stretch; border: 1px solid #eee; border-left-width: 5px; }
+        .delete-btn { color: red; font-weight: bold; cursor: pointer; width: auto; border: none; background: none; padding: 5px 10px; font-size: 28px; line-height: 1; }
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); }
+        .modal-content { background: white; padding: 20px; width: 85%; max-width: 400px; margin: 15% auto; border-radius: 12px; position: relative; overflow-y: auto; max-height: 80vh; }
+        .btn-blue { background-color: #007bff; color: white; border: none; font-size: 18px; padding: 18px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        .btn-green { background-color: #28a745; color: white; border: none; font-size: 18px; padding: 18px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        .timbre-container { display: flex; align-items: center; gap: 10px; margin-top: 20px; cursor: pointer; font-weight: normal; }
+        .timbre-container input { width: 20px; height: 20px; margin: 0; }
+        .custom-dates-box { background: #f0f7ff; padding: 10px; border-radius: 6px; border: 1px dashed #007bff; margin-top: 10px; }
+        hr { border: 0; border-top: 1px solid #eee; margin: 15px 0; }
+        
+        .block-orange { background-color: #fff3e0; border: 2px solid #ff9800; padding: 15px; border-radius: 10px; margin: 10px 0; }
+        .block-yellow { background-color: #fffde7; border: 2px solid #fbc02d; padding: 15px; border-radius: 10px; margin: 10px 0; }
+        .btn-copy { background-color: #333; color: white; border: none; padding: 10px 20px; font-size: 14px; font-weight: bold; border-radius: 6px; cursor: pointer; float: right; margin-top: 10px; }
+        .btn-copy:hover { background-color: #555; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Calculateur de séjour 🏨</h2>
+    <div id="setup-menu" class="menu-initial">
+        <button class="btn-choice btn-dates" onclick="startMode('dates')">📅 Commencer le calcul</button>
+        <button class="btn-choice" style="background:linear-gradient(135deg,#28a745,#1e7e34);" onclick="openEuroSettings()">💶/💵 Paramètres Devises</button>
+    </div>
+    <div id="main-form" class="hidden">
+        <div class="top-buttons">
+            <button class="btn-back" onclick="goBack()">⬅️ Retour au menu</button>
+            <button class="btn-reset" onclick="reinitialiserTout()">🧹 Effacer</button>
+        </div>
+
+        <div id="group-dates" class="hidden">
+            <label>Date d'arrivée : <input type="text" id="arrival" oninput="updateDatesFromNights('arrival', 'departure', 'calcNights'); updateAll()"></label>
+            <div style="display: flex; gap: 10px;">
+                <div style="flex: 2;"><label>Date de départ : <input type="text" id="departure" oninput="updateNightsFromDates('arrival', 'departure', 'calcNights'); updateAll()"></label></div>
+                <div style="flex: 1;"><label>Nuits : <input type="number" id="calcNights" min="1" placeholder="0" oninput="updateDatesFromNights('arrival', 'departure', 'calcNights'); updateAll()"></label></div>
+            </div>
+        </div>
+        <div id="group-nights" class="hidden"><label>Nombre de nuitées : <input type="number" id="nbNights" value="1" min="1" oninput="updateAll()"></label></div>
+        <label>Remise (%) : <input type="number" id="remise" value="0" min="0" max="100" oninput="updateAll()"></label>
+        <div class="section-box">
+            <h3 id="ch-form-title">Détails chambre</h3>
+            <div id="diff-dates-container" style="display:none; margin-bottom: 15px;">
+                <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; font-size: 0.9em; cursor: pointer;">
+                    <input type="checkbox" id="hasDiffDates" onchange="toggleDiffDates()" style="width: 18px; height: 18px; margin: 0;"> Dates différentes
+                </label>
+                <div id="custom-dates-fields" class="custom-dates-box" style="display:none;">
+                    <label>Arrivée spécifique :</label><input type="text" id="specArrival" oninput="updateDatesFromNights('specArrival', 'specDeparture', 'specNights'); updateAll()">
+                    <div style="display: flex; gap: 10px;">
+                        <div style="flex: 2;"><label>Départ spécifique :</label><input type="text" id="specDeparture" oninput="updateNightsFromDates('specArrival', 'specDeparture', 'specNights'); updateAll()"></div>
+                        <div style="flex: 1;"><label>Nuits :</label><input type="number" id="specNights" min="1" placeholder="0" oninput="updateDatesFromNights('specArrival', 'specDeparture', 'specNights'); updateAll()"></div>
+                    </div>
+                </div>
+            </div>
+            <label>Type :
+                <select id="chType">
+                    <option value="single">Chambre Single (18 000)</option>
+                    <option value="double">Chambre Double (20 000)</option>
+                    <option value="twin">Chambre Twin (20 000)</option>
+                    <option value="suiteSingle">Suite Junior Single (24 000)</option>
+                    <option value="suiteDouble">Suite Junior Double (27 000)</option>
+                    <option value="supSingle">Suite Sup Single (30 000)</option>
+                    <option value="supDouble">Suite Sup Double (33 000)</option>
+                </select>
+            </label>
+            <div style="display: flex; gap: 10px;">
+                <div style="flex: 1;"><label>Lits suppl. (3500) : <input type="number" id="chLit" value="0" min="0"></label></div>
+                <div style="flex: 1;"><label>Prix Dîner TTC/nuitée : <input type="number" id="chDinerPrix" value="0" min="0" placeholder="0"></label></div>
+            </div>
+            <button class="btn-blue" onclick="ajouterChambre()">+ Ajouter à la liste</button>
+        </div>
+        <div id="liste-chambres"></div>
+        <div id="calcul-section" style="display:none;">
+            <label class="timbre-container"><input type="checkbox" id="timbre" checked onchange="updateAll()"> Appliquer droit de timbre</label>
+            <button class="btn-green" onclick="calculerTotal()">Calculer le total général</button>
+        </div>
+    </div>
+</div>
+
+<div id="resModal" class="modal"><div class="modal-content"><span style="float:right; cursor:pointer; font-size:24px;" onclick="closeM()">&times;</span><div id="resBody"></div><button class="btn-copy" id="btnCopyMain" onclick="copierResultat()">📋 Copier</button></div></div>
+
+<div id="euroModal" class="modal">
+    <div class="modal-content">
+        <button class="btn-back" onclick="closeEuro()">⬅️ Retour</button>
+        <h3 style="text-align:center;">💶/💵 Paramètres Devises</h3>
+        <label>Euro marché noir : <input type="number" id="euroBlack"></label>
+        <label>Euro officiel : <input type="number" id="euroOfficial"></label>
+        <hr>
+        <label>Dollar marché noir : <input type="number" id="usdBlack"></label>
+        <label>Dollar officiel : <input type="number" id="usdOfficial"></label>
+        <button class="btn-green" onclick="saveEuro()">Sauvegarder</button>
+    </div>
+</div>
+
+<script>
+    let chambres = [];
+    let currentMode = '';
+    let currentChIndex = null;
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    const PRIX = { single: 18000, double: 20000, twin: 20000, suiteSingle: 24000, suiteDouble: 27000, supSingle: 30000, supDouble: 33000, lit: 3500 };
+    const NOMS = { single: "Single", double: "Double", twin: "Twin", suiteSingle: "Suite Jr Single", suiteDouble: "Suite Jr Double", supSingle: "Suite Sup. Single", supDouble: "Suite Sup. Double" };
+
+    let euroBlack = parseFloat(localStorage.getItem("euroBlack")) || 270;
+    let euroOfficial = parseFloat(localStorage.getItem("euroOfficial")) || 150;
+    let usdBlack = parseFloat(localStorage.getItem("usdBlack")) || 250;
+    let usdOfficial = parseFloat(localStorage.getItem("usdOfficial")) || 140;
+
+    window.onload = function() {
+        const ids = ['arrival', 'departure', 'specArrival', 'specDeparture'];
+        ids.forEach(id => {
+            let el = document.getElementById(id);
+            if(isMobile) { el.type = "date"; } 
+            else { el.type = "text"; el.placeholder = "JJ/MM/AAAA"; }
+        });
+        document.getElementById('euroBlack').value = euroBlack;
+        document.getElementById('euroOfficial').value = euroOfficial;
+        document.getElementById('usdBlack').value = usdBlack;
+        document.getElementById('usdOfficial').value = usdOfficial;
+    };
+
+    function startMode(mode) {
+        currentMode = mode;
+        document.getElementById('setup-menu').classList.add('hidden');
+        document.getElementById('main-form').classList.remove('hidden');
+        document.getElementById('group-dates').classList.toggle('hidden', mode !== 'dates');
+        document.getElementById('group-nights').classList.toggle('hidden', mode !== 'nights');
+        updateTitle();
+    }
+
+    function goBack() { if (chambres.length > 0 && !confirm("Effacer la liste ?")) return; location.reload(); }
+
+    function reinitialiserTout() {
+        if (chambres.length > 0 && !confirm("Voulez-vous vraiment effacer toutes les données saisies ?")) return;
+        chambres = [];
+        const inputs = ['arrival', 'departure', 'calcNights', 'nbNights', 'remise', 'specArrival', 'specDeparture', 'specNights', 'chLit', 'chDinerPrix'];
+        inputs.forEach(id => {
+            const el = document.getElementById(id);
+            if(el) el.value = (id === 'nbNights' ? 1 : 0);
+        });
+        document.getElementById('hasDiffDates').checked = false;
+        document.getElementById('custom-dates-fields').style.display = 'none';
+        document.getElementById('diff-dates-container').style.display = 'none';
+        document.getElementById('calcul-section').style.display = 'none';
+        updateTitle();
+        updateAll();
+    }
+
+    function parseDate(str) {
+        if (!str) return null;
+        if(isMobile) { const p = str.split('-'); return new Date(p[0], p[1]-1, p[2]); } 
+        else { const p = str.split('/'); if (p.length !== 3) return null; return new Date(p[2], p[1]-1, p[0]); }
+    }
+
+    function formatDateForInput(date) {
+        if (!date) return "";
+        const day = ("0" + date.getDate()).slice(-2);
+        const month = ("0" + (date.getMonth() + 1)).slice(-2);
+        const year = date.getFullYear();
+        return isMobile ? `${year}-${month}-${day}` : `${day}/${month}/${year}`;
+    }
+
+    function updateNightsFromDates(idArr, idDep, idNights) {
+        const arrVal = document.getElementById(idArr).value;
+        const s = parseDate(arrVal);
+        const e = parseDate(document.getElementById(idDep).value);
+        if(isMobile && arrVal) { document.getElementById(idDep).min = arrVal; }
+        if (s && e && e > s) { const diff = Math.ceil((e - s) / 86400000); document.getElementById(idNights).value = diff; }
+    }
+
+    function updateDatesFromNights(idArr, idDep, idNights) {
+        const arrVal = document.getElementById(idArr).value;
+        const s = parseDate(arrVal);
+        const n = parseInt(document.getElementById(idNights).value);
+        if(isMobile && arrVal) { document.getElementById(idDep).min = arrVal; }
+        if (s && n > 0) { const e = new Date(s); e.setDate(s.getDate() + n); document.getElementById(idDep).value = formatDateForInput(e); }
+    }
+
+    function fDate(d) { return d.toLocaleDateString('fr-FR'); }
+    function updateAll() { afficherListe(); }
+
+    function ajouterChambre() {
+        const litCount = parseInt(document.getElementById('chLit').value) || 0;
+        if (litCount >= 10) { alert("impossible de mettre 10 lit sup dans une chambre"); return; }
+        const isDiff = document.getElementById('hasDiffDates').checked;
+        let d1 = document.getElementById(isDiff ? 'specArrival' : 'arrival').value;
+        let d2 = document.getElementById(isDiff ? 'specDeparture' : 'departure').value;
+        let nInput = parseInt(document.getElementById(isDiff ? 'specNights' : 'calcNights').value) || 0;
+        if (currentMode === 'dates' && !parseDate(d1) && nInput <= 0) { alert("Veuillez saisir une date ou un nombre de nuits."); return; }
+        chambres.push({
+            type: document.getElementById('chType').value,
+            lits: litCount, dinerPrix: parseInt(document.getElementById('chDinerPrix').value) || 0,
+            isDiff: isDiff, d1_fixed: d1, d2_fixed: d2, n_fixed: nInput
+        });
+        document.getElementById('chLit').value = 0;
+        document.getElementById('chDinerPrix').value = 0;
+        document.getElementById('hasDiffDates').checked = false;
+        document.getElementById('custom-dates-fields').style.display = 'none';
+        if(currentMode === 'dates') document.getElementById('diff-dates-container').style.display = 'block';
+        document.getElementById('calcul-section').style.display = 'block';
+        updateTitle(); updateAll();
+    }
+
+    function afficherListe() {
+        const cont = document.getElementById('liste-chambres');
+        if (chambres.length === 0) { cont.innerHTML = ""; return; }
+        cont.innerHTML = `<h3>Récapitulatif : (${chambres.length} ch)</h3>`;
+        chambres.forEach((c, i) => {
+            let nuits = 0, labelDate = "", dateError = false;
+            if (currentMode === 'dates') {
+                let s = parseDate(c.isDiff ? c.d1_fixed : document.getElementById('arrival').value);
+                let e = parseDate(c.isDiff ? c.d2_fixed : document.getElementById('departure').value);
+                let n = c.isDiff ? c.n_fixed : (parseInt(document.getElementById('calcNights').value) || 0);
+                if (s && e && e > s) { 
+                    nuits = Math.ceil((e - s) / 86400000); 
+                    let texteNuit = nuits >= 2 ? "nuitées" : "nuitée";
+                    labelDate = `Du ${fDate(s)} au ${fDate(e)} (${nuits} ${texteNuit})`; 
+                }
+                else if (n > 0) { 
+                    nuits = n; 
+                    let texteNuit = nuits >= 2 ? "nuitées" : "nuitée";
+                    labelDate = `${nuits} ${texteNuit} (sans dates)`; 
+                }
+                else { labelDate = "<span style='color:red;'>Infos manquantes</span>"; dateError = true; }
+            } else { 
+                nuits = parseInt(document.getElementById('nbNights').value) || 0; 
+                let texteNuit = nuits >= 2 ? "nuitées" : "nuitée";
+                labelDate = `${nuits} ${texteNuit}`; 
+                if(nuits <= 0) dateError = true; 
+            }
+            const totalCh = dateError ? 0 : (PRIX[c.type] + (c.lits * PRIX.lit) + c.dinerPrix) * nuits;
+            let nomChambre = NOMS[c.type];
+            if(c.lits > 0) nomChambre += ` + ${c.lits} lit sup`;
+            if(c.dinerPrix > 0) nomChambre += ` + Dîner (${c.dinerPrix} DZD)`;
+            cont.innerHTML += `
+                <div class="chambre-item">
+                    <div style="flex-grow:1;">
+                        <strong>Ch. ${i+1}: ${nomChambre}</strong><br><small>${labelDate}</small><br>
+                        <strong>${totalCh>0?totalCh.toLocaleString()+' DZD':'--'}</strong>
+                    </div>
+                    <div style="display:flex; flex-direction:column; justify-content: space-between; align-items: flex-end; margin-left:10px;">
+                        <button class="delete-btn" onclick="supprimer(${i})">X</button>
+                        <button onclick="calculerIndividuel(${i})" style="width:auto; padding:5px 8px; background:#28a745; color:white; border:none; border-radius:4px; font-size:12px; cursor:pointer;">Calculer</button>
+                    </div>
+                </div>`;
+        });
+    }
+
+    function supprimer(i) {
+        chambres.splice(i, 1);
+        if (chambres.length === 0) { document.getElementById('diff-dates-container').style.display = 'none'; document.getElementById('calcul-section').style.display = 'none'; }
+        updateTitle(); updateAll();
+    }
+
+    function genererHTMLResultat(titre, data) {
+        let html = `<div style="text-align: center;">`; 
+        html += `<h3 style="color:#28a745; margin-bottom:10px;">${titre}</h3>`;
+        html += `<div class="block-orange" style="font-size:1.1em; line-height:1.4;">`;
+        html += `TTC : <b>${data.ttc.toLocaleString()} DZD</b><br>`;
+        if (data.remiseP > 0) { html += `Remise : <b style="color:red;">-${data.montantRemise.toLocaleString()} DZD</b><br>`; }
+        html += `Timbre : <b>${data.timbre.toLocaleString()} DZD</b><br>`;
+        html += `<div style="font-size:1.4em; border-top:1px solid #ff9800; margin-top:5px; padding-top:5px;"><b class="net-val" style="color:#28a745;">Net: ${data.net.toLocaleString()} DZD</b></div>`;
+        if (data.remiseP > 0) {
+            html += `<div style="color:#666; font-size: 0.9em; margin-top:5px;">Ancien Net: <span class="old-net">${data.ancienNet.toLocaleString()}</span> DZD</div>`;
+            html += `<div style="font-weight:bold; color:#ff9800; font-size: 0.9em;">Différence : ${data.diffDinar.toLocaleString()} DZD</div>`;
+        }
+        html += `</div>`;
+        html += `<div class="block-yellow" style="font-size:0.9em; line-height:1.5;">`;
+        html += `<div style="color:#28a745; font-weight:bold;">Euro Noir: <span class="eur-n">${data.eurN}</span> € | Officiel: <span class="eur-o">${data.eurO}</span> €</div>`;
+        if (data.remiseP > 0) {
+            html += `<div style="color:#777;">Ancien Euro Noir: <span class="eur-n-old">${data.eurNOld}</span> € | Ancien officiel: <span class="eur-o-old">${data.eurOOld}</span> €</div>`;
+            html += `<div style="font-weight:bold; color:#ff9800;">Différence (${data.gagneEurN} €) | Différence (${data.gagneEurO} €)</div>`;
+        }
+        html += `<hr style="margin:8px 0; border-top:1px dashed #fbc02d;">`;
+        html += `<div style="color:#28a745; font-weight:bold;">USD Noir: <span class="usd-n">${data.usdN}</span> $ | Officiel: <span class="usd-o">${data.usdO}</span> $</div>`;
+        if (data.remiseP > 0) {
+            html += `<div style="color:#777;">Ancien USD Noir: <span class="usd-n-old">${data.usdNOld}</span> $ | Ancien Officiel: <span class="usd-o-old">${data.usdOOld}</span> $</div>`;
+            html += `<div style="font-weight:bold; color:#ff9800;">Différence (${data.gagneUsdN} $) | Différence (${data.gagneUsdO} $)</div>`;
+        }
+        html += `</div></div>`;
+        return html;
+    }
+
+    function calculerData(ttcInitial) {
+        const remP = parseFloat(document.getElementById('remise').value) || 0;
+        const timbreFunc = (v) => (document.getElementById('timbre').checked && v >= 300) ? Math.max(5, Math.round(v * (v > 100000 ? 0.02 : (v > 30000 ? 0.015 : 0.01)))) : 0;
+        const ancienTimbre = timbreFunc(ttcInitial);
+        const ancienNet = Math.round(ttcInitial + ancienTimbre);
+        const nouveauTTC = ttcInitial * (1 - remP / 100);
+        const nouveauTimbre = timbreFunc(nouveauTTC);
+        const nouveauNet = Math.round(nouveauTTC + nouveauTimbre);
+        return {
+            ttc: Math.round(ttcInitial), remiseP: remP, montantRemise: Math.round(ttcInitial - nouveauTTC), timbre: nouveauTimbre, net: nouveauNet, ancienNet: ancienNet, diffDinar: ancienNet - nouveauNet,
+            eurN: (nouveauNet/euroBlack).toFixed(2), eurO: (nouveauNet/euroOfficial).toFixed(2), eurNOld: (ancienNet/euroBlack).toFixed(2), eurOOld: (ancienNet/euroOfficial).toFixed(2),
+            usdN: (nouveauNet/usdBlack).toFixed(2), usdO: (nouveauNet/usdOfficial).toFixed(2), usdNOld: (ancienNet/usdBlack).toFixed(2), usdOOld: (ancienNet/usdOfficial).toFixed(2),
+            gagneEurN: ((ancienNet - nouveauNet)/euroBlack).toFixed(2), gagneEurO: ((ancienNet - nouveauNet)/euroOfficial).toFixed(2),
+            gagneUsdN: ((ancienNet - nouveauNet)/usdBlack).toFixed(2), gagneUsdO: ((ancienNet - nouveauNet)/usdOfficial).toFixed(2)
+        };
+    }
+
+    function calculerIndividuel(index) {
+        currentChIndex = index;
+        const c = chambres[index];
+        let n = 0;
+        if (currentMode === 'dates') {
+            let s = parseDate(c.isDiff ? c.d1_fixed : document.getElementById('arrival').value);
+            let e = parseDate(c.isDiff ? c.d2_fixed : document.getElementById('departure').value);
+            let ni = c.isDiff ? c.n_fixed : (parseInt(document.getElementById('calcNights').value) || 0);
+            if (s && e && e > s) n = Math.ceil((e - s) / 86400000); else n = ni;
+        } else { n = parseInt(document.getElementById('nbNights').value) || 0; }
+        if (n <= 0) return;
+        const ttcInitial = (PRIX[c.type] + (c.lits * PRIX.lit) + c.dinerPrix) * n;
+        const data = calculerData(ttcInitial);
+        document.getElementById('resBody').innerHTML = genererHTMLResultat(`Détail Chambre ${index + 1}`, data);
+        document.getElementById('resModal').style.display = 'block';
+    }
+
+    function calculerTotal() {
+        currentChIndex = null;
+        let totalTTCInitial = 0;
+        chambres.forEach(c => {
+            let n = 0;
+            if (currentMode === 'dates') {
+                let s = parseDate(c.isDiff ? c.d1_fixed : document.getElementById('arrival').value);
+                let e = parseDate(c.isDiff ? c.d2_fixed : document.getElementById('departure').value);
+                let ni = c.isDiff ? c.n_fixed : (parseInt(document.getElementById('calcNights').value) || 0);
+                if (s && e && e > s) n = Math.ceil((e - s) / 86400000); else n = ni;
+            } else { n = parseInt(document.getElementById('nbNights').value) || 0; }
+            totalTTCInitial += (PRIX[c.type] + (c.lits * PRIX.lit) + c.dinerPrix) * n;
+        });
+        const data = calculerData(totalTTCInitial);
+        document.getElementById('resBody').innerHTML = genererHTMLResultat("Total Général", data);
+        document.getElementById('resModal').style.display = 'block';
+    }
+
+    function copierResultat() {
+        const net = document.querySelector('.net-val').innerText.split(': ')[1];
+        const eurN = document.querySelector('.eur-n').innerText;
+        const eurO = document.querySelector('.eur-o').innerText;
+        const usdN = document.querySelector('.usd-n').innerText;
+        const usdO = document.querySelector('.usd-o').innerText;
+        const hasRemise = parseFloat(document.getElementById('remise').value) > 0;
+        const strike = (text) => text.split('').map(char => char + '\u0336').join('');
+        const phraseDinar = "En dinars :";
+        const phraseEurLiquide = "En Euro, après conversion du liquide en dinars:";
+        const phraseEurCarte = "En Euros avec carte bancaire :";
+        const phraseUsdLiquide = "En dollars, après conversion du liquide en dinars:";
+        const phraseUsdCarte = "En dollars avec carte bancaire :";
+
+        function getChInfo(c) {
+            let nom = NOMS[c.type].replace("Twin", "Twin (lits jumeaux)").replace("Suite Jr", "Suite junior").replace("Suite Sup", "Suite supérieur");
+            let litL = c.lits >= 2 ? "lits supplémentaires" : "lit supplémentaire";
+            if(c.lits > 0) nom += ` + ${c.lits} ${litL}`;
+            if(c.dinerPrix > 0) nom += ` + Dîner (${c.dinerPrix} DZD)`;
+            let lineDate = "";
+            let n = 0;
+            if (currentMode === 'dates') {
+                let s = parseDate(c.isDiff ? c.d1_fixed : document.getElementById('arrival').value);
+                let e = parseDate(c.isDiff ? c.d2_fixed : document.getElementById('departure').value);
+                if (s && e && e > s) { n = Math.ceil((e-s)/86400000); let txt = n >= 2 ? 'nuitées' : 'nuitée'; lineDate = `Du ${fDate(s)} au ${fDate(e)} (${n} ${txt})`; }
+                else { n = c.isDiff ? c.n_fixed : (parseInt(document.getElementById('calcNights').value) || 0); let txt = n >= 2 ? 'nuitées' : 'nuitée'; lineDate = `${n} ${txt}`; }
+            } else { n = parseInt(document.getElementById('nbNights').value) || 0; let txt = n >= 2 ? 'nuitées' : 'nuitée'; lineDate = `${n} ${txt}`; }
+            const ttcInitial = (PRIX[c.type] + (c.lits * PRIX.lit) + c.dinerPrix) * n;
+            const dataCh = calculerData(ttcInitial);
+            return { nom, lineDate, dataCh };
+        }
+
+        let texte = "";
+        if (currentChIndex !== null) {
+            const info = getChInfo(chambres[currentChIndex]);
+            texte = `tarif de Chambre ${currentChIndex + 1}: ${info.nom}\n${info.lineDate}\n`;
+            if (hasRemise) {
+                const oldNet = document.querySelector('.old-net').innerText;
+                const eurNOld = document.querySelector('.eur-n-old').innerText;
+                const eurOOld = document.querySelector('.eur-o-old').innerText;
+                const usdNOld = document.querySelector('.usd-n-old').innerText;
+                const usdOOld = document.querySelector('.usd-o-old').innerText;
+                texte += `${phraseDinar} ${net} au lieu de : ${strike(oldNet)} DZD\n${phraseEurLiquide} ${eurN} € au lieu de : ${strike(eurNOld)} €\n${phraseEurCarte} ${eurO} € au lieu de : ${strike(eurOOld)} €\n${phraseUsdLiquide} ${usdN} $ au lieu de : ${strike(usdNOld)} $\n${phraseUsdCarte} ${usdO} $ au lieu de : ${strike(usdOOld)} $`;
+            } else { texte += `${phraseDinar} ${net}\n${phraseEurLiquide} ${eurN} €\n${phraseEurCarte} ${eurO} €\n${phraseUsdLiquide} ${usdN} $\n${phraseUsdCarte} ${usdO} $`; }
+        } else {
+            if (chambres.length === 1) {
+                const info = getChInfo(chambres[0]);
+                texte = "LE TOTAL :\n";
+                texte += `Chambre 1: ${info.nom}\n${info.lineDate}\n`;
+                if (hasRemise) {
+                    const oldNet = document.querySelector('.old-net').innerText;
+                    const eurNOld = document.querySelector('.eur-n-old').innerText;
+                    const eurOOld = document.querySelector('.eur-o-old').innerText;
+                    const usdNOld = document.querySelector('.usd-n-old').innerText;
+                    const usdOOld = document.querySelector('.usd-o-old').innerText;
+                    texte += `${phraseDinar} ${net} au lieu de : ${strike(oldNet)} DZD\n${phraseEurLiquide} ${eurN} € au lieu de : ${strike(eurNOld)} €\n${phraseEurCarte} ${eurO} € au lieu de : ${strike(eurOOld)} €\n${phraseUsdLiquide} ${usdN} $ au lieu de : ${strike(usdNOld)} $\n${phraseUsdCarte} ${usdO} $ au lieu de : ${strike(usdOOld)} $`;
+                } else { texte += `${phraseDinar} ${net}\n${phraseEurLiquide} ${eurN} €\n${phraseEurCarte} ${eurO} €\n${phraseUsdLiquide} ${usdN} $\n${phraseUsdCarte} ${usdO} $`; }
+            } else {
+                texte = "LE TOTAL :\n";
+                if (hasRemise) {
+                    const oldNet = document.querySelector('.old-net').innerText;
+                    const eurNOld = document.querySelector('.eur-n-old').innerText;
+                    const eurOOld = document.querySelector('.eur-o-old').innerText;
+                    const usdNOld = document.querySelector('.usd-n-old').innerText;
+                    const usdOOld = document.querySelector('.usd-o-old').innerText;
+                    texte += `En dinars : ${net} au lieu de : ${strike(oldNet)} DZD\n${phraseEurLiquide} ${eurN} € au lieu de : ${strike(eurNOld)} €\n${phraseEurCarte} ${eurO} € au lieu de : ${strike(eurOOld)} €\n${phraseUsdLiquide} ${usdN} $ au lieu de : ${strike(usdNOld)} $\n${phraseUsdCarte} ${usdO} $ au lieu de : ${strike(usdOOld)} $`;
+                } else { texte += `En dinars : ${net}\n${phraseEurLiquide} ${eurN} €\n${phraseEurCarte} ${eurO} €\n${phraseUsdLiquide} ${usdN} $\n${phraseUsdCarte} ${usdO} $`; }
+                texte += "\n\nLe détail des chambres:";
+                chambres.forEach((c, i) => {
+                    const info = getChInfo(c); const d = info.dataCh;
+                    texte += `\nChambre ${i+1}: ${info.nom}\n${info.lineDate}\n`;
+                    if (hasRemise) {
+                        texte += `En dinars : ${d.net.toLocaleString()} au lieu de : ${strike(d.ancienNet.toLocaleString())} DZD\n${phraseEurLiquide} ${d.eurN} € au lieu de : ${strike(d.eurNOld)} €\n${phraseEurCarte} ${d.eurO} € au lieu de : ${strike(d.eurOOld)} €\n${phraseUsdLiquide} ${d.usdN} $ au lieu de : ${strike(d.usdNOld)} $\n${phraseUsdCarte} ${d.usdO} $ au lieu de : ${strike(d.usdOOld)} $\n`;
+                    } else { texte += `En dinars : ${d.net.toLocaleString()} DZD\n${phraseEurLiquide} ${d.eurN} €\n${phraseEurCarte} ${d.eurO} €\n${phraseUsdLiquide} ${d.usdN} $\n${phraseUsdCarte} ${d.usdO} $\n`; }
+                });
+            }
+        }
+        const el = document.createElement('textarea'); el.value = texte; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el);
+        const btn = document.getElementById('btnCopyMain'); const orig = btn.innerText; btn.innerText = "✅ Copié !"; setTimeout(() => btn.innerText = orig, 2000);
+    }
+    function updateTitle() { document.getElementById('ch-form-title').innerText = `Détails chambre ${chambres.length + 1}`; }
+    function toggleDiffDates() { document.getElementById('custom-dates-fields').style.display = document.getElementById('hasDiffDates').checked ? 'block' : 'none'; }
+    function closeM() { document.getElementById('resModal').style.display = 'none'; }
+    function openEuroSettings() { document.getElementById('euroModal').style.display='block'; }
+    function closeEuro() { document.getElementById('euroModal').style.display='none'; }
+    function saveEuro() { 
+        euroBlack = parseFloat(document.getElementById('euroBlack').value) || 270; euroOfficial = parseFloat(document.getElementById('euroOfficial').value) || 150; usdBlack = parseFloat(document.getElementById('usdBlack').value) || 250; usdOfficial = parseFloat(document.getElementById('usdOfficial').value) || 140;
+        localStorage.setItem("euroBlack", euroBlack); localStorage.setItem("euroOfficial", euroOfficial); localStorage.setItem("usdBlack", usdBlack); localStorage.setItem("usdOfficial", usdOfficial); closeEuro(); updateAll(); 
+    }
+</script>
+</body>
+</html>
