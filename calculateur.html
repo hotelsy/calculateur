@@ -113,12 +113,11 @@
     const PRIX = { single: 18000, double: 20000, twin: 20000, suiteSingle: 24000, suiteDouble: 27000, supSingle: 30000, supDouble: 33000, lit: 3500 };
     const NOMS = { single: "Single", double: "Double", twin: "Twin", suiteSingle: "Suite Jr Single", suiteDouble: "Suite Jr Double", supSingle: "Suite Sup. Single", supDouble: "Suite Sup. Double" };
 
-    // --- TAUX DE CHANGE FIXES (MODIFIABLES MANUELLEMENT ICI) ---
+    // --- TAUX DE CHANGE FIXES ---
     let euroBlack = 270;
     let euroOfficial = 150;
     let usdBlack = 250;
     let usdOfficial = 140;
-    // -----------------------------------------------------------
 
     window.onload = function() {
         const ids = ['arrival', 'departure', 'specArrival', 'specDeparture'];
@@ -369,11 +368,10 @@
         const usdO = document.querySelector('.usd-o').innerText;
         const hasRemise = parseFloat(document.getElementById('remise').value) > 0;
         const strike = (text) => text.split('').map(char => char + '\u0336').join('');
-        const phraseDinar = "En dinars :";
-        const phraseEurLiquide = "En Euro, après conversion du liquide en dinars:";
-        const phraseEurCarte = "En Euros avec carte bancaire :";
-        const phraseUsdLiquide = "En dollars, après conversion du liquide en dinars:";
-        const phraseUsdCarte = "En dollars avec carte bancaire :";
+        
+        const phraseEur = (eN, eO) => `En Euro parallèle: ${eN} € | avec carte : ${eO} €`;
+        const phraseUsd = (uN, uO) => `En dollars parallèle: ${uN} $ | avec carte : ${uO} $`;
+        const noteFinale = "\nnb: le parallèle c'est après la conversion du liquide en dinars";
 
         let texte = "";
         if (currentChIndex !== null) {
@@ -381,42 +379,31 @@
             texte = `tarif de Chambre ${currentChIndex + 1}: ${info.nom}\n${info.lineDate}\n`;
             if (hasRemise) {
                 const oldNet = document.querySelector('.old-net').innerText;
-                const eurNOld = document.querySelector('.eur-n-old').innerText;
-                const eurOOld = document.querySelector('.eur-o-old').innerText;
-                const usdNOld = document.querySelector('.usd-n-old').innerText;
-                const usdOOld = document.querySelector('.usd-o-old').innerText;
-                texte += `${phraseDinar} ${net} au lieu de : ${strike(oldNet)} DZD\n${phraseEurLiquide} ${eurN} € au lieu de : ${strike(eurNOld)} €\n${phraseEurCarte} ${eurO} € au lieu de : ${strike(eurOOld)} €\n${phraseUsdLiquide} ${usdN} $ au lieu de : ${strike(usdNOld)} $\n${phraseUsdCarte} ${usdO} $ au lieu de : ${strike(usdOOld)} $`;
-            } else { texte += `${phraseDinar} ${net}\n${phraseEurLiquide} ${eurN} €\n${phraseEurCarte} ${eurO} €\n${phraseUsdLiquide} ${usdN} $\n${phraseUsdCarte} ${usdO} $`; }
+                texte += `En dinars : ${net} au lieu de : ${strike(oldNet)} DZD\n${phraseEur(eurN, eurO)}\n${phraseUsd(usdN, usdO)}${noteFinale}`;
+            } else { texte += `En dinars : ${net}\n${phraseEur(eurN, eurO)}\n${phraseUsd(usdN, usdO)}${noteFinale}`; }
         } else {
+            texte = "LE TOTAL :\n";
             if (chambres.length === 1) {
                 const info = getChInfo(chambres[0]);
-                texte = "LE TOTAL :\n";
                 texte += `Chambre 1: ${info.nom}\n${info.lineDate}\n`;
-                if (hasRemise) {
-                    const oldNet = document.querySelector('.old-net').innerText;
-                    const eurNOld = document.querySelector('.eur-n-old').innerText;
-                    const eurOOld = document.querySelector('.eur-o-old').innerText;
-                    const usdNOld = document.querySelector('.usd-n-old').innerText;
-                    const usdOOld = document.querySelector('.usd-o-old').innerText;
-                    texte += `${phraseDinar} ${net} au lieu de : ${strike(oldNet)} DZD\n${phraseEurLiquide} ${eurN} € au lieu de : ${strike(eurNOld)} €\n${phraseEurCarte} ${eurO} € au lieu de : ${strike(eurOOld)} €\n${phraseUsdLiquide} ${usdN} $ au lieu de : ${strike(usdNOld)} $\n${phraseUsdCarte} ${usdO} $ au lieu de : ${strike(usdOOld)} $`;
-                } else { texte += `${phraseDinar} ${net}\n${phraseEurLiquide} ${eurN} €\n${phraseEurCarte} ${eurO} €\n${phraseUsdLiquide} ${usdN} $\n${phraseUsdCarte} ${usdO} $`; }
-            } else {
-                texte = "LE TOTAL :\n";
-                if (hasRemise) {
-                    const oldNet = document.querySelector('.old-net').innerText;
-                    const eurNOld = document.querySelector('.eur-n-old').innerText;
-                    const eurOOld = document.querySelector('.eur-o-old').innerText;
-                    const usdNOld = document.querySelector('.usd-n-old').innerText;
-                    const usdOOld = document.querySelector('.usd-o-old').innerText;
-                    texte += `En dinars : ${net} au lieu de : ${strike(oldNet)} DZD\n${phraseEurLiquide} ${eurN} € au lieu de : ${strike(eurNOld)} €\n${phraseEurCarte} ${eurO} € au lieu de : ${strike(eurOOld)} €\n${phraseUsdLiquide} ${usdN} $ au lieu de : ${strike(usdNOld)} $\n${phraseUsdCarte} ${usdO} $ au lieu de : ${strike(usdOOld)} $`;
-                } else { texte += `En dinars : ${net}\n${phraseEurLiquide} ${eurN} €\n${phraseEurCarte} ${eurO} €\n${phraseUsdLiquide} ${usdN} $\n${phraseUsdCarte} ${usdO} $`; }
+            }
+
+            if (hasRemise) {
+                const oldNet = document.querySelector('.old-net').innerText;
+                texte += `En dinars : ${net} au lieu de : ${strike(oldNet)} DZD\n${phraseEur(eurN, eurO)}\n${phraseUsd(usdN, usdO)}${noteFinale}`;
+            } else { texte += `En dinars : ${net}\n${phraseEur(eurN, eurO)}\n${phraseUsd(usdN, usdO)}${noteFinale}`; }
+
+            if (chambres.length > 1) {
                 texte += "\n\nLe détail des chambres:";
                 chambres.forEach((c, i) => {
                     const info = getChInfo(c); const d = info.dataCh;
                     texte += `\nChambre ${i+1}: ${info.nom}\n${info.lineDate}\n`;
                     if (hasRemise) {
-                        texte += `En dinars : ${d.net.toLocaleString()} au lieu de : ${strike(d.ancienNet.toLocaleString())} DZD\n${phraseEurLiquide} ${d.eurN} € au lieu de : ${strike(d.eurNOld)} €\n${phraseEurCarte} ${d.eurO} € au lieu de : ${strike(d.eurOOld)} €\n${phraseUsdLiquide} ${d.usdN} $ au lieu de : ${strike(d.usdNOld)} $\n${phraseUsdCarte} ${d.usdO} $ au lieu de : ${strike(d.usdOOld)} $\n`;
-                    } else { texte += `En dinars : ${d.net.toLocaleString()} DZD\n${phraseEurLiquide} ${d.eurN} €\n${phraseEurCarte} ${d.eurO} €\n${phraseUsdLiquide} ${d.usdN} $\n${phraseUsdCarte} ${d.usdO} $\n`; }
+                        texte += `En dinars : ${d.net.toLocaleString()} au lieu de : ${strike(d.ancienNet.toLocaleString())} DZD\n`;
+                    } else { 
+                        texte += `En dinars : ${d.net.toLocaleString()} DZD\n`; 
+                    }
+                    texte += `${phraseEur(d.eurN, d.eurO)}\n${phraseUsd(d.usdN, d.usdO)}\n`;
                 });
             }
         }
