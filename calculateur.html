@@ -11,7 +11,6 @@
         .menu-initial { display: flex; flex-direction: column; gap: 15px; margin-top: 50px; }
         .btn-choice { padding: 25px; font-size: 18px; font-weight: bold; color: white; border: none; border-radius: 12px; cursor: pointer; transition: transform 0.2s; }
         .btn-dates { background-color: #0056b3; }
-        .btn-nights { background-color: #6c757d; }
         .btn-choice:hover { transform: scale(1.02); opacity: 0.9; }
         .hidden { display: none; }
         label { display: block; margin-top: 15px; font-weight: bold; }
@@ -45,8 +44,8 @@
     <h2>Calculateur de séjour 🏨</h2>
     <div id="setup-menu" class="menu-initial">
         <button class="btn-choice btn-dates" onclick="startMode('dates')">📅 Commencer le calcul</button>
-        <button class="btn-choice" style="background:linear-gradient(135deg,#28a745,#1e7e34);" onclick="openEuroSettings()">💶/💵 Paramètres Devises</button>
     </div>
+
     <div id="main-form" class="hidden">
         <div class="top-buttons">
             <button class="btn-back" onclick="goBack()">⬅️ Retour au menu</button>
@@ -60,8 +59,11 @@
                 <div style="flex: 1;"><label>Nuits : <input type="number" id="calcNights" min="1" placeholder="0" oninput="updateDatesFromNights('arrival', 'departure', 'calcNights'); updateAll()"></label></div>
             </div>
         </div>
+        
         <div id="group-nights" class="hidden"><label>Nombre de nuitées : <input type="number" id="nbNights" value="1" min="1" oninput="updateAll()"></label></div>
+        
         <label>Remise (%) : <input type="number" id="remise" value="0" min="0" max="100" oninput="updateAll()"></label>
+        
         <div class="section-box">
             <h3 id="ch-form-title">Détails chambre</h3>
             <div id="diff-dates-container" style="display:none; margin-bottom: 15px;">
@@ -103,19 +105,6 @@
 
 <div id="resModal" class="modal"><div class="modal-content"><span style="float:right; cursor:pointer; font-size:24px;" onclick="closeM()">&times;</span><div id="resBody"></div><button class="btn-copy" id="btnCopyMain" onclick="copierResultat()">📋 Copier</button></div></div>
 
-<div id="euroModal" class="modal">
-    <div class="modal-content">
-        <button class="btn-back" onclick="closeEuro()">⬅️ Retour</button>
-        <h3 style="text-align:center;">💶/💵 Paramètres Devises</h3>
-        <label>Euro marché noir : <input type="number" id="euroBlack"></label>
-        <label>Euro officiel : <input type="number" id="euroOfficial"></label>
-        <hr>
-        <label>Dollar marché noir : <input type="number" id="usdBlack"></label>
-        <label>Dollar officiel : <input type="number" id="usdOfficial"></label>
-        <button class="btn-green" onclick="saveEuro()">Sauvegarder</button>
-    </div>
-</div>
-
 <script>
     let chambres = [];
     let currentMode = '';
@@ -124,10 +113,12 @@
     const PRIX = { single: 18000, double: 20000, twin: 20000, suiteSingle: 24000, suiteDouble: 27000, supSingle: 30000, supDouble: 33000, lit: 3500 };
     const NOMS = { single: "Single", double: "Double", twin: "Twin", suiteSingle: "Suite Jr Single", suiteDouble: "Suite Jr Double", supSingle: "Suite Sup. Single", supDouble: "Suite Sup. Double" };
 
-    let euroBlack = parseFloat(localStorage.getItem("euroBlack")) || 270;
-    let euroOfficial = parseFloat(localStorage.getItem("euroOfficial")) || 150;
-    let usdBlack = parseFloat(localStorage.getItem("usdBlack")) || 250;
-    let usdOfficial = parseFloat(localStorage.getItem("usdOfficial")) || 140;
+    // --- TAUX DE CHANGE FIXES (MODIFIABLES MANUELLEMENT ICI) ---
+    let euroBlack = 270;
+    let euroOfficial = 150;
+    let usdBlack = 250;
+    let usdOfficial = 140;
+    // -----------------------------------------------------------
 
     window.onload = function() {
         const ids = ['arrival', 'departure', 'specArrival', 'specDeparture'];
@@ -136,10 +127,6 @@
             if(isMobile) { el.type = "date"; } 
             else { el.type = "text"; el.placeholder = "JJ/MM/AAAA"; }
         });
-        document.getElementById('euroBlack').value = euroBlack;
-        document.getElementById('euroOfficial').value = euroOfficial;
-        document.getElementById('usdBlack').value = usdBlack;
-        document.getElementById('usdOfficial').value = usdOfficial;
     };
 
     function startMode(mode) {
@@ -356,6 +343,24 @@
         document.getElementById('resModal').style.display = 'block';
     }
 
+    function getChInfo(c) {
+        let nom = NOMS[c.type].replace("Twin", "Twin (lits jumeaux)").replace("Suite Jr", "Suite junior").replace("Suite Sup", "Suite supérieur");
+        let litL = c.lits >= 2 ? "lits supplémentaires" : "lit supplémentaire";
+        if(c.lits > 0) nom += ` + ${c.lits} ${litL}`;
+        if(c.dinerPrix > 0) nom += ` + Dîner (${c.dinerPrix} DZD)`;
+        let lineDate = "";
+        let n = 0;
+        if (currentMode === 'dates') {
+            let s = parseDate(c.isDiff ? c.d1_fixed : document.getElementById('arrival').value);
+            let e = parseDate(c.isDiff ? c.d2_fixed : document.getElementById('departure').value);
+            if (s && e && e > s) { n = Math.ceil((e-s)/86400000); let txt = n >= 2 ? 'nuitées' : 'nuitée'; lineDate = `Du ${fDate(s)} au ${fDate(e)} (${n} ${txt})`; }
+            else { n = c.isDiff ? c.n_fixed : (parseInt(document.getElementById('calcNights').value) || 0); let txt = n >= 2 ? 'nuitées' : 'nuitée'; lineDate = `${n} ${txt}`; }
+        } else { n = parseInt(document.getElementById('nbNights').value) || 0; let txt = n >= 2 ? 'nuitées' : 'nuitée'; lineDate = `${n} ${txt}`; }
+        const ttcInitial = (PRIX[c.type] + (c.lits * PRIX.lit) + c.dinerPrix) * n;
+        const dataCh = calculerData(ttcInitial);
+        return { nom, lineDate, dataCh };
+    }
+
     function copierResultat() {
         const net = document.querySelector('.net-val').innerText.split(': ')[1];
         const eurN = document.querySelector('.eur-n').innerText;
@@ -369,24 +374,6 @@
         const phraseEurCarte = "En Euros avec carte bancaire :";
         const phraseUsdLiquide = "En dollars, après conversion du liquide en dinars:";
         const phraseUsdCarte = "En dollars avec carte bancaire :";
-
-        function getChInfo(c) {
-            let nom = NOMS[c.type].replace("Twin", "Twin (lits jumeaux)").replace("Suite Jr", "Suite junior").replace("Suite Sup", "Suite supérieur");
-            let litL = c.lits >= 2 ? "lits supplémentaires" : "lit supplémentaire";
-            if(c.lits > 0) nom += ` + ${c.lits} ${litL}`;
-            if(c.dinerPrix > 0) nom += ` + Dîner (${c.dinerPrix} DZD)`;
-            let lineDate = "";
-            let n = 0;
-            if (currentMode === 'dates') {
-                let s = parseDate(c.isDiff ? c.d1_fixed : document.getElementById('arrival').value);
-                let e = parseDate(c.isDiff ? c.d2_fixed : document.getElementById('departure').value);
-                if (s && e && e > s) { n = Math.ceil((e-s)/86400000); let txt = n >= 2 ? 'nuitées' : 'nuitée'; lineDate = `Du ${fDate(s)} au ${fDate(e)} (${n} ${txt})`; }
-                else { n = c.isDiff ? c.n_fixed : (parseInt(document.getElementById('calcNights').value) || 0); let txt = n >= 2 ? 'nuitées' : 'nuitée'; lineDate = `${n} ${txt}`; }
-            } else { n = parseInt(document.getElementById('nbNights').value) || 0; let txt = n >= 2 ? 'nuitées' : 'nuitée'; lineDate = `${n} ${txt}`; }
-            const ttcInitial = (PRIX[c.type] + (c.lits * PRIX.lit) + c.dinerPrix) * n;
-            const dataCh = calculerData(ttcInitial);
-            return { nom, lineDate, dataCh };
-        }
 
         let texte = "";
         if (currentChIndex !== null) {
@@ -436,15 +423,10 @@
         const el = document.createElement('textarea'); el.value = texte; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el);
         const btn = document.getElementById('btnCopyMain'); const orig = btn.innerText; btn.innerText = "✅ Copié !"; setTimeout(() => btn.innerText = orig, 2000);
     }
+    
     function updateTitle() { document.getElementById('ch-form-title').innerText = `Détails chambre ${chambres.length + 1}`; }
     function toggleDiffDates() { document.getElementById('custom-dates-fields').style.display = document.getElementById('hasDiffDates').checked ? 'block' : 'none'; }
     function closeM() { document.getElementById('resModal').style.display = 'none'; }
-    function openEuroSettings() { document.getElementById('euroModal').style.display='block'; }
-    function closeEuro() { document.getElementById('euroModal').style.display='none'; }
-    function saveEuro() { 
-        euroBlack = parseFloat(document.getElementById('euroBlack').value) || 270; euroOfficial = parseFloat(document.getElementById('euroOfficial').value) || 150; usdBlack = parseFloat(document.getElementById('usdBlack').value) || 250; usdOfficial = parseFloat(document.getElementById('usdOfficial').value) || 140;
-        localStorage.setItem("euroBlack", euroBlack); localStorage.setItem("euroOfficial", euroOfficial); localStorage.setItem("usdBlack", usdBlack); localStorage.setItem("usdOfficial", usdOfficial); closeEuro(); updateAll(); 
-    }
 </script>
 </body>
 </html>
