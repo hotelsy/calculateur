@@ -1,4 +1,3 @@
-<!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8" />
@@ -81,8 +80,8 @@
             <label>Type :
                 <select id="chType">
                     <option value="single">Chambre Single (18 000)</option>
-                    <option value="double">Chambre Double (20 000)</option>
-                    <option value="twin">Chambre Twin (20 000)</option>
+                    <option value="double">Chambre Double (21 000)</option>
+                    <option value="twin">Chambre Twin (21 000)</option>
                     <option value="suiteSingle">Suite Junior Single (24 000)</option>
                     <option value="suiteDouble">Suite Junior Double (27 000)</option>
                     <option value="supSingle">Suite Sup Single (30 000)</option>
@@ -110,8 +109,11 @@
     let currentMode = '';
     let currentChIndex = null;
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    const PRIX = { single: 18000, double: 20000, twin: 20000, suiteSingle: 24000, suiteDouble: 27000, supSingle: 30000, supDouble: 33000, lit: 3500 };
+    const PRIX = { single: 18000, double: 21000, twin: 21000, suiteSingle: 24000, suiteDouble: 27000, supSingle: 30000, supDouble: 33000, lit: 3500 };
     const NOMS = { single: "Single", double: "Double", twin: "Twin", suiteSingle: "Suite Jr Single", suiteDouble: "Suite Jr Double", supSingle: "Suite Sup. Single", supDouble: "Suite Sup. Double" };
+
+    // --- TAXES DE SEJOUR PAR TYPE (Par nuitée) ---
+    const TAXES = { single: 200, double: 400, twin: 400, suiteSingle: 200, suiteDouble: 400, supSingle: 200, supDouble: 400 };
 
     // --- TAUX DE CHANGE FIXES ---
     let euroBlack = 270;
@@ -237,7 +239,20 @@
                 labelDate = `${nuits} ${texteNuit}`; 
                 if(nuits <= 0) dateError = true; 
             }
-            const totalCh = dateError ? 0 : (PRIX[c.type] + (c.lits * PRIX.lit) + c.dinerPrix) * nuits;
+            
+            // --- LOGIQUE DE REMISE EXCLUANT LA TAXE DE SEJOUR ---
+            let totalCh = 0;
+            if (!dateError) {
+                const taxeParNuit = TAXES[c.type] || 0;
+                const totalTaxe = taxeParNuit * nuits;
+                const baseChambreSansTaxe = (PRIX[c.type] - taxeParNuit) * nuits;
+                const extras = ((c.lits * PRIX.lit) + c.dinerPrix) * nuits;
+                
+                const remP = parseFloat(document.getElementById('remise').value) || 0;
+                const baseRemise = baseChambreSansTaxe + extras;
+                totalCh = (baseRemise * (1 - remP / 100)) + totalTaxe;
+            }
+
             let nomChambre = NOMS[c.type];
             if(c.lits > 0) nomChambre += ` + ${c.lits} lit sup`;
             if(c.dinerPrix > 0) nomChambre += ` + Dîner (${c.dinerPrix} DZD)`;
@@ -245,7 +260,7 @@
                 <div class="chambre-item">
                     <div style="flex-grow:1;">
                         <strong>Ch. ${i+1}: ${nomChambre}</strong><br><small>${labelDate}</small><br>
-                        <strong>${totalCh>0?totalCh.toLocaleString()+' DZD':'--'}</strong>
+                        <strong>${totalCh>0?Math.round(totalCh).toLocaleString()+' DZD':'--'}</strong>
                     </div>
                     <div style="display:flex; flex-direction:column; justify-content: space-between; align-items: flex-end; margin-left:10px;">
                         <button class="delete-btn" onclick="supprimer(${i})">X</button>
@@ -290,16 +305,22 @@
         return html;
     }
 
-    function calculerData(ttcInitial) {
+    function calculerData(ttcInitial, totalTaxeSpecifique) {
         const remP = parseFloat(document.getElementById('remise').value) || 0;
         const timbreFunc = (v) => (document.getElementById('timbre').checked && v >= 300) ? Math.max(5, Math.round(v * (v > 100000 ? 0.02 : (v > 30000 ? 0.015 : 0.01)))) : 0;
+        
         const ancienTimbre = timbreFunc(ttcInitial);
         const ancienNet = Math.round(ttcInitial + ancienTimbre);
-        const nouveauTTC = ttcInitial * (1 - remP / 100);
+        
+        // Séparation de la taxe pour la remise
+        const baseSoumiseARemise = ttcInitial - totalTaxeSpecifique;
+        const nouveauTTC = (baseSoumiseARemise * (1 - remP / 100)) + totalTaxeSpecifique;
+        
         const nouveauTimbre = timbreFunc(nouveauTTC);
         const nouveauNet = Math.round(nouveauTTC + nouveauTimbre);
+        
         return {
-            ttc: Math.round(ttcInitial), remiseP: remP, montantRemise: Math.round(ttcInitial - nouveauTTC), timbre: nouveauTimbre, net: nouveauNet, ancienNet: ancienNet, diffDinar: ancienNet - nouveauNet,
+            ttc: Math.round(nouveauTTC), remiseP: remP, montantRemise: Math.round(ttcInitial - nouveauTTC), timbre: nouveauTimbre, net: nouveauNet, ancienNet: ancienNet, diffDinar: ancienNet - nouveauNet,
             eurN: (nouveauNet/euroBlack).toFixed(2), eurO: (nouveauNet/euroOfficial).toFixed(2), eurNOld: (ancienNet/euroBlack).toFixed(2), eurOOld: (ancienNet/euroOfficial).toFixed(2),
             usdN: (nouveauNet/usdBlack).toFixed(2), usdO: (nouveauNet/usdOfficial).toFixed(2), usdNOld: (ancienNet/usdBlack).toFixed(2), usdOOld: (ancienNet/usdOfficial).toFixed(2),
             gagneEurN: ((ancienNet - nouveauNet)/euroBlack).toFixed(2), gagneEurO: ((ancienNet - nouveauNet)/euroOfficial).toFixed(2),
@@ -318,8 +339,11 @@
             if (s && e && e > s) n = Math.ceil((e - s) / 86400000); else n = ni;
         } else { n = parseInt(document.getElementById('nbNights').value) || 0; }
         if (n <= 0) return;
+        
         const ttcInitial = (PRIX[c.type] + (c.lits * PRIX.lit) + c.dinerPrix) * n;
-        const data = calculerData(ttcInitial);
+        const totalTaxe = (TAXES[c.type] || 0) * n;
+        
+        const data = calculerData(ttcInitial, totalTaxe);
         document.getElementById('resBody').innerHTML = genererHTMLResultat(`Détail Chambre ${index + 1}`, data);
         document.getElementById('resModal').style.display = 'block';
     }
@@ -327,6 +351,8 @@
     function calculerTotal() {
         currentChIndex = null;
         let totalTTCInitial = 0;
+        let totalTaxeGeneral = 0;
+        
         chambres.forEach(c => {
             let n = 0;
             if (currentMode === 'dates') {
@@ -335,9 +361,12 @@
                 let ni = c.isDiff ? c.n_fixed : (parseInt(document.getElementById('calcNights').value) || 0);
                 if (s && e && e > s) n = Math.ceil((e - s) / 86400000); else n = ni;
             } else { n = parseInt(document.getElementById('nbNights').value) || 0; }
+            
             totalTTCInitial += (PRIX[c.type] + (c.lits * PRIX.lit) + c.dinerPrix) * n;
+            totalTaxeGeneral += (TAXES[c.type] || 0) * n;
         });
-        const data = calculerData(totalTTCInitial);
+        
+        const data = calculerData(totalTTCInitial, totalTaxeGeneral);
         document.getElementById('resBody').innerHTML = genererHTMLResultat("Total Général", data);
         document.getElementById('resModal').style.display = 'block';
     }
@@ -355,8 +384,11 @@
             if (s && e && e > s) { n = Math.ceil((e-s)/86400000); let txt = n >= 2 ? 'nuitées' : 'nuitée'; lineDate = `Du ${fDate(s)} au ${fDate(e)} (${n} ${txt})`; }
             else { n = c.isDiff ? c.n_fixed : (parseInt(document.getElementById('calcNights').value) || 0); let txt = n >= 2 ? 'nuitées' : 'nuitée'; lineDate = `${n} ${txt}`; }
         } else { n = parseInt(document.getElementById('nbNights').value) || 0; let txt = n >= 2 ? 'nuitées' : 'nuitée'; lineDate = `${n} ${txt}`; }
+        
         const ttcInitial = (PRIX[c.type] + (c.lits * PRIX.lit) + c.dinerPrix) * n;
-        const dataCh = calculerData(ttcInitial);
+        const totalTaxe = (TAXES[c.type] || 0) * n;
+        
+        const dataCh = calculerData(ttcInitial, totalTaxe);
         return { nom, lineDate, dataCh };
     }
 
