@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8" />
@@ -33,16 +34,20 @@
         
         .block-orange { background-color: #fff3e0; border: 2px solid #ff9800; padding: 15px; border-radius: 10px; margin: 10px 0; }
         .block-yellow { background-color: #fffde7; border: 2px solid #fbc02d; padding: 15px; border-radius: 10px; margin: 10px 0; }
-        .btn-copy { background-color: #333; color: white; border: none; padding: 10px 20px; font-size: 14px; font-weight: bold; border-radius: 6px; cursor: pointer; float: right; margin-top: 10px; }
-        .btn-copy:hover { background-color: #555; }
+        
+        .modal-footer { display: flex; flex-direction: column; gap: 8px; margin-top: 15px; }
+        .btn-copy { background-color: #333; color: white; border: none; padding: 12px; font-size: 14px; font-weight: bold; border-radius: 6px; cursor: pointer; }
+        .btn-copy-dinar { background-color: #0056b3; color: white; border: none; padding: 12px; font-size: 14px; font-weight: bold; border-radius: 6px; cursor: pointer; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <h2>Calculateur de séjour 🏨</h2>
+    
     <div id="setup-menu" class="menu-initial">
         <button class="btn-choice btn-dates" onclick="startMode('dates')">📅 Commencer le calcul</button>
+        <button class="btn-choice" style="background-color: #6c757d;" onclick="afficherTaux()">💶/💵 Taux de devise</button>
     </div>
 
     <div id="main-form" class="hidden">
@@ -102,24 +107,31 @@
     </div>
 </div>
 
-<div id="resModal" class="modal"><div class="modal-content"><span style="float:right; cursor:pointer; font-size:24px;" onclick="closeM()">&times;</span><div id="resBody"></div><button class="btn-copy" id="btnCopyMain" onclick="copierResultat()">📋 Copier</button></div></div>
+<div id="resModal" class="modal">
+    <div class="modal-content">
+        <span style="float:right; cursor:pointer; font-size:24px;" onclick="closeM()">&times;</span>
+        <div id="resBody"></div>
+        <div class="modal-footer" id="modalFooter">
+            <button class="btn-copy" id="btnCopyDetails" onclick="copierResultat(false)">📋 Copier en détails</button>
+            <button class="btn-copy-dinar" id="btnCopyDinars" onclick="copierResultat(true)">📋 Copier en Dinars uniquement</button>
+        </div>
+    </div>
+</div>
 
 <script>
     let chambres = [];
     let currentMode = '';
     let currentChIndex = null;
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    
     const PRIX = { single: 18000, double: 21000, twin: 21000, suiteSingle: 24000, suiteDouble: 27000, supSingle: 30000, supDouble: 33000, lit: 3500 };
     const NOMS = { single: "Single", double: "Double", twin: "Twin", suiteSingle: "Suite Jr Single", suiteDouble: "Suite Jr Double", supSingle: "Suite Sup. Single", supDouble: "Suite Sup. Double" };
-
-    // --- TAXES DE SEJOUR PAR TYPE (Par nuitée) ---
     const TAXES = { single: 200, double: 400, twin: 400, suiteSingle: 200, suiteDouble: 400, supSingle: 200, supDouble: 400 };
 
-    // --- TAUX DE CHANGE FIXES ---
-    let euroBlack = 270;
-    let euroOfficial = 150;
-    let usdBlack = 250;
-    let usdOfficial = 140;
+    let euroBlack = 278;
+    let euroOfficial = 152;
+    let usdBlack = 238;
+    let usdOfficial = 132;
 
     window.onload = function() {
         const ids = ['arrival', 'departure', 'specArrival', 'specDeparture'];
@@ -217,50 +229,13 @@
         if (chambres.length === 0) { cont.innerHTML = ""; return; }
         cont.innerHTML = `<h3>Récapitulatif : (${chambres.length} ch)</h3>`;
         chambres.forEach((c, i) => {
-            let nuits = 0, labelDate = "", dateError = false;
-            if (currentMode === 'dates') {
-                let s = parseDate(c.isDiff ? c.d1_fixed : document.getElementById('arrival').value);
-                let e = parseDate(c.isDiff ? c.d2_fixed : document.getElementById('departure').value);
-                let n = c.isDiff ? c.n_fixed : (parseInt(document.getElementById('calcNights').value) || 0);
-                if (s && e && e > s) { 
-                    nuits = Math.ceil((e - s) / 86400000); 
-                    let texteNuit = nuits >= 2 ? "nuitées" : "nuitée";
-                    labelDate = `Du ${fDate(s)} au ${fDate(e)} (${nuits} ${texteNuit})`; 
-                }
-                else if (n > 0) { 
-                    nuits = n; 
-                    let texteNuit = nuits >= 2 ? "nuitées" : "nuitée";
-                    labelDate = `${nuits} ${texteNuit} (sans dates)`; 
-                }
-                else { labelDate = "<span style='color:red;'>Infos manquantes</span>"; dateError = true; }
-            } else { 
-                nuits = parseInt(document.getElementById('nbNights').value) || 0; 
-                let texteNuit = nuits >= 2 ? "nuitées" : "nuitée";
-                labelDate = `${nuits} ${texteNuit}`; 
-                if(nuits <= 0) dateError = true; 
-            }
-            
-            // --- LOGIQUE DE REMISE EXCLUANT LA TAXE DE SEJOUR ---
-            let totalCh = 0;
-            if (!dateError) {
-                const taxeParNuit = TAXES[c.type] || 0;
-                const totalTaxe = taxeParNuit * nuits;
-                const baseChambreSansTaxe = (PRIX[c.type] - taxeParNuit) * nuits;
-                const extras = ((c.lits * PRIX.lit) + c.dinerPrix) * nuits;
-                
-                const remP = parseFloat(document.getElementById('remise').value) || 0;
-                const baseRemise = baseChambreSansTaxe + extras;
-                totalCh = (baseRemise * (1 - remP / 100)) + totalTaxe;
-            }
-
-            let nomChambre = NOMS[c.type];
-            if(c.lits > 0) nomChambre += ` + ${c.lits} lit sup`;
-            if(c.dinerPrix > 0) nomChambre += ` + Dîner (${c.dinerPrix} DZD)`;
+            let info = getChInfo(c);
+            let totalCh = info.dataCh.net;
             cont.innerHTML += `
                 <div class="chambre-item">
                     <div style="flex-grow:1;">
-                        <strong>Ch. ${i+1}: ${nomChambre}</strong><br><small>${labelDate}</small><br>
-                        <strong>${totalCh>0?Math.round(totalCh).toLocaleString()+' DZD':'--'}</strong>
+                        <strong>Ch. ${i+1}: ${info.nom}</strong><br><small>${info.lineDate}</small><br>
+                        <strong>${totalCh > 0 ? Math.round(totalCh).toLocaleString() + ' DZD' : '--'}</strong>
                     </div>
                     <div style="display:flex; flex-direction:column; justify-content: space-between; align-items: flex-end; margin-left:10px;">
                         <button class="delete-btn" onclick="supprimer(${i})">X</button>
@@ -281,25 +256,31 @@
         html += `<h3 style="color:#28a745; margin-bottom:10px;">${titre}</h3>`;
         html += `<div class="block-orange" style="font-size:1.1em; line-height:1.4;">`;
         html += `TTC : <b>${data.ttc.toLocaleString()} DZD</b><br>`;
-        if (data.remiseP > 0) { html += `Remise : <b style="color:red;">-${data.montantRemise.toLocaleString()} DZD</b><br>`; }
         html += `Timbre : <b>${data.timbre.toLocaleString()} DZD</b><br>`;
         html += `<div style="font-size:1.4em; border-top:1px solid #ff9800; margin-top:5px; padding-top:5px;"><b class="net-val" style="color:#28a745;">Net: ${data.net.toLocaleString()} DZD</b></div>`;
         if (data.remiseP > 0) {
             html += `<div style="color:#666; font-size: 0.9em; margin-top:5px;">Ancien Net: <span class="old-net">${data.ancienNet.toLocaleString()}</span> DZD</div>`;
-            html += `<div style="font-weight:bold; color:#ff9800; font-size: 0.9em;">Différence : ${data.diffDinar.toLocaleString()} DZD</div>`;
+            let diffNet = data.net - data.ancienNet;
+            html += `<div style="font-weight:bold; color:#ff0000; font-size: 0.9em;">Remise : ${diffNet.toLocaleString()} DZD</div>`;
         }
         html += `</div>`;
         html += `<div class="block-yellow" style="font-size:0.9em; line-height:1.5;">`;
         html += `<div style="color:#28a745; font-weight:bold;">Euro Noir: <span class="eur-n">${data.eurN}</span> € | Officiel: <span class="eur-o">${data.eurO}</span> €</div>`;
         if (data.remiseP > 0) {
             html += `<div style="color:#777;">Ancien Euro Noir: <span class="eur-n-old">${data.eurNOld}</span> € | Ancien officiel: <span class="eur-o-old">${data.eurOOld}</span> €</div>`;
-            html += `<div style="font-weight:bold; color:#ff9800;">Différence (${data.gagneEurN} €) | Différence (${data.gagneEurO} €)</div>`;
+            // Calcul de la différence négative pour l'euro
+            let diffEurN = (data.eurN - data.eurNOld).toFixed(2);
+            let diffEurO = (data.eurO - data.eurOOld).toFixed(2);
+            html += `<div style="font-weight:bold; color:#ff0000;">Remise (${diffEurN} €) | Remise (${diffEurO} €)</div>`;
         }
         html += `<hr style="margin:8px 0; border-top:1px dashed #fbc02d;">`;
         html += `<div style="color:#28a745; font-weight:bold;">USD Noir: <span class="usd-n">${data.usdN}</span> $ | Officiel: <span class="usd-o">${data.usdO}</span> $</div>`;
         if (data.remiseP > 0) {
             html += `<div style="color:#777;">Ancien USD Noir: <span class="usd-n-old">${data.usdNOld}</span> $ | Ancien Officiel: <span class="usd-o-old">${data.usdOOld}</span> $</div>`;
-            html += `<div style="font-weight:bold; color:#ff9800;">Différence (${data.gagneUsdN} $) | Différence (${data.gagneUsdO} $)</div>`;
+            // Calcul de la différence négative pour le dollar
+            let diffUsdN = (data.usdN - data.usdNOld).toFixed(2);
+            let diffUsdO = (data.usdO - data.usdOOld).toFixed(2);
+            html += `<div style="font-weight:bold; color:#ff0000;">Remise (${diffUsdN} $) | Remise (${diffUsdO} $)</div>`;
         }
         html += `</div></div>`;
         return html;
@@ -312,7 +293,6 @@
         const ancienTimbre = timbreFunc(ttcInitial);
         const ancienNet = Math.round(ttcInitial + ancienTimbre);
         
-        // Séparation de la taxe pour la remise
         const baseSoumiseARemise = ttcInitial - totalTaxeSpecifique;
         const nouveauTTC = (baseSoumiseARemise * (1 - remP / 100)) + totalTaxeSpecifique;
         
@@ -330,21 +310,8 @@
 
     function calculerIndividuel(index) {
         currentChIndex = index;
-        const c = chambres[index];
-        let n = 0;
-        if (currentMode === 'dates') {
-            let s = parseDate(c.isDiff ? c.d1_fixed : document.getElementById('arrival').value);
-            let e = parseDate(c.isDiff ? c.d2_fixed : document.getElementById('departure').value);
-            let ni = c.isDiff ? c.n_fixed : (parseInt(document.getElementById('calcNights').value) || 0);
-            if (s && e && e > s) n = Math.ceil((e - s) / 86400000); else n = ni;
-        } else { n = parseInt(document.getElementById('nbNights').value) || 0; }
-        if (n <= 0) return;
-        
-        const ttcInitial = (PRIX[c.type] + (c.lits * PRIX.lit) + c.dinerPrix) * n;
-        const totalTaxe = (TAXES[c.type] || 0) * n;
-        
-        const data = calculerData(ttcInitial, totalTaxe);
-        document.getElementById('resBody').innerHTML = genererHTMLResultat(`Détail Chambre ${index + 1}`, data);
+        const info = getChInfo(chambres[index]);
+        document.getElementById('resBody').innerHTML = genererHTMLResultat(`Détail Chambre ${index + 1}`, info.dataCh);
         document.getElementById('resModal').style.display = 'block';
     }
 
@@ -354,16 +321,9 @@
         let totalTaxeGeneral = 0;
         
         chambres.forEach(c => {
-            let n = 0;
-            if (currentMode === 'dates') {
-                let s = parseDate(c.isDiff ? c.d1_fixed : document.getElementById('arrival').value);
-                let e = parseDate(c.isDiff ? c.d2_fixed : document.getElementById('departure').value);
-                let ni = c.isDiff ? c.n_fixed : (parseInt(document.getElementById('calcNights').value) || 0);
-                if (s && e && e > s) n = Math.ceil((e - s) / 86400000); else n = ni;
-            } else { n = parseInt(document.getElementById('nbNights').value) || 0; }
-            
-            totalTTCInitial += (PRIX[c.type] + (c.lits * PRIX.lit) + c.dinerPrix) * n;
-            totalTaxeGeneral += (TAXES[c.type] || 0) * n;
+            let info = getChInfo(c);
+            totalTTCInitial += (PRIX[c.type] + (c.lits * PRIX.lit) + c.dinerPrix) * info.n;
+            totalTaxeGeneral += (TAXES[c.type] || 0) * info.n;
         });
         
         const data = calculerData(totalTTCInitial, totalTaxeGeneral);
@@ -372,10 +332,11 @@
     }
 
     function getChInfo(c) {
-        let nom = NOMS[c.type].replace("Twin", "Twin (lits jumeaux)").replace("Suite Jr", "Suite junior").replace("Suite Sup", "Suite supérieur");
-        let litL = c.lits >= 2 ? "lits supplémentaires" : "lit supplémentaire";
-        if(c.lits > 0) nom += ` + ${c.lits} ${litL}`;
-        if(c.dinerPrix > 0) nom += ` + Dîner (${c.dinerPrix} DZD)`;
+        let baseNom = NOMS[c.type];
+        let nomComplet = baseNom;
+        if(c.lits > 0) nomComplet += ` + ${c.lits} lit sup`;
+        if(c.dinerPrix > 0) nomComplet += ` + Dîner (${c.dinerPrix} DZD)`;
+        
         let lineDate = "";
         let n = 0;
         if (currentMode === 'dates') {
@@ -387,65 +348,105 @@
         
         const ttcInitial = (PRIX[c.type] + (c.lits * PRIX.lit) + c.dinerPrix) * n;
         const totalTaxe = (TAXES[c.type] || 0) * n;
-        
         const dataCh = calculerData(ttcInitial, totalTaxe);
-        return { nom, lineDate, dataCh };
+        
+        return { nom: nomComplet, lineDate, dataCh, n };
     }
 
-    function copierResultat() {
-        const net = document.querySelector('.net-val').innerText.split(': ')[1];
-        const eurN = document.querySelector('.eur-n').innerText;
-        const eurO = document.querySelector('.eur-o').innerText;
-        const usdN = document.querySelector('.usd-n').innerText;
-        const usdO = document.querySelector('.usd-o').innerText;
+    function copierResultat(dinarOnly = false) {
         const hasRemise = parseFloat(document.getElementById('remise').value) > 0;
         const strike = (text) => text.split('').map(char => char + '\u0336').join('');
-        
-        const phraseEur = (eN, eO) => `En Euro parallèle: ${eN} € | avec carte : ${eO} €`;
-        const phraseUsd = (uN, uO) => `En dollars parallèle: ${uN} $ | avec carte : ${uO} $`;
-        const noteFinale = "\nnb: le parallèle c'est après la conversion du liquide en dinars";
-
         let texte = "";
+        
         if (currentChIndex !== null) {
             const info = getChInfo(chambres[currentChIndex]);
+            const d = info.dataCh;
             texte = `tarif de Chambre ${currentChIndex + 1}: ${info.nom}\n${info.lineDate}\n`;
-            if (hasRemise) {
-                const oldNet = document.querySelector('.old-net').innerText;
-                texte += `En dinars : ${net} au lieu de : ${strike(oldNet)} DZD\n${phraseEur(eurN, eurO)}\n${phraseUsd(usdN, usdO)}${noteFinale}`;
-            } else { texte += `En dinars : ${net}\n${phraseEur(eurN, eurO)}\n${phraseUsd(usdN, usdO)}${noteFinale}`; }
-        } else {
-            texte = "LE TOTAL :\n";
-            if (chambres.length === 1) {
-                const info = getChInfo(chambres[0]);
-                texte += `Chambre 1: ${info.nom}\n${info.lineDate}\n`;
+            if (hasRemise) { texte += `En dinars : ${strike(d.ancienNet.toLocaleString())} DZD ${d.net.toLocaleString()} DZD\n`; } 
+            else { texte += `En dinars : ${d.net.toLocaleString()} DZD\n`; }
+            if (!dinarOnly) {
+                texte += `En Euro parallèle: ${hasRemise ? strike(d.eurNOld) + ' € ' : ''}${d.eurN} € | avec carte : ${hasRemise ? strike(d.eurOOld) + ' € ' : ''}${d.eurO} €\n`;
+                texte += `En dollars parallèle: ${hasRemise ? strike(d.usdNOld) + ' $ ' : ''}${d.usdN} $ | avec carte : ${hasRemise ? strike(d.usdOOld) + ' $ ' : ''}${d.usdO} $`;
             }
+        } 
+        else {
+            let totalTTC = 0;
+            let totalTaxeGeneral = 0;
+            let datesIdentiquesGénéral = true;
+            let premièreDateGénéral = null;
+            
+            chambres.forEach((c, index) => {
+                const info = getChInfo(c);
+                totalTTC += (PRIX[c.type] + (c.lits * PRIX.lit) + c.dinerPrix) * info.n;
+                totalTaxeGeneral += (TAXES[c.type] || 0) * info.n;
+                if (index === 0) premièreDateGénéral = info.lineDate;
+                else if (info.lineDate !== premièreDateGénéral) datesIdentiquesGénéral = false;
+            });
 
-            if (hasRemise) {
-                const oldNet = document.querySelector('.old-net').innerText;
-                texte += `En dinars : ${net} au lieu de : ${strike(oldNet)} DZD\n${phraseEur(eurN, eurO)}\n${phraseUsd(usdN, usdO)}${noteFinale}`;
-            } else { texte += `En dinars : ${net}\n${phraseEur(eurN, eurO)}\n${phraseUsd(usdN, usdO)}${noteFinale}`; }
+            const globalData = calculerData(totalTTC, totalTaxeGeneral);
+            texte = "LE TOTAL :\n";
+            texte += hasRemise ? `${strike(globalData.ancienNet.toLocaleString())} DZD ${globalData.net.toLocaleString()} DZD\n` : `${globalData.net.toLocaleString()} DZD\n`;
 
-            if (chambres.length > 1) {
-                texte += "\n\nLe détail des chambres:";
-                chambres.forEach((c, i) => {
-                    const info = getChInfo(c); const d = info.dataCh;
-                    texte += `\nChambre ${i+1}: ${info.nom}\n${info.lineDate}\n`;
-                    if (hasRemise) {
-                        texte += `En dinars : ${d.net.toLocaleString()} au lieu de : ${strike(d.ancienNet.toLocaleString())} DZD\n`;
-                    } else { 
-                        texte += `En dinars : ${d.net.toLocaleString()} DZD\n`; 
+            if (dinarOnly) {
+                let regroupement = {};
+                chambres.forEach(c => {
+                    const info = getChInfo(c);
+                    let cle = `${info.nom}|${info.lineDate}`;
+                    if(!regroupement[cle]) regroupement[cle] = { nom: info.nom, date: info.lineDate, count: 0, nuits: info.n };
+                    regroupement[cle].count++;
+                });
+
+                if (currentMode === 'nights' || datesIdentiquesGénéral) {
+                    for (let key in regroupement) {
+                        let r = regroupement[key];
+                        if (currentMode === 'nights') {
+                            texte += `${r.count} Chambre : ${r.nom} | ${r.nuits} ${r.nuits >= 2 ? 'nuitées' : 'nuitée'}\n`;
+                        } else {
+                            texte += `${r.count} Chambre : ${r.nom}\n`;
+                        }
                     }
-                    texte += `${phraseEur(d.eurN, d.eurO)}\n${phraseUsd(d.usdN, d.usdO)}\n`;
+                    if (currentMode === 'dates' && datesIdentiquesGénéral) texte += premièreDateGénéral;
+                } else {
+                    for (let key in regroupement) {
+                        let r = regroupement[key];
+                        texte += `${r.count} Chambre : ${r.nom} | ${r.date}\n`;
+                    }
+                }
+            } else {
+                texte += `En Euro parallèle: ${hasRemise ? strike(globalData.eurNOld) + ' € ' : ''}${globalData.eurN} € | avec carte : ${hasRemise ? strike(globalData.eurOOld) + ' € ' : ''}${globalData.eurO} €\n`;
+                texte += `En dollars parallèle: ${hasRemise ? strike(globalData.usdNOld) + ' $ ' : ''}${globalData.usdN} $ | avec carte : ${hasRemise ? strike(globalData.usdOOld) + ' $ ' : ''}${globalData.usdO} $\n`;
+                texte += "\nLe détail des chambres:";
+                chambres.forEach((c, i) => {
+                    const info = getChInfo(c);
+                    const d = info.dataCh;
+                    texte += `\n\nChambre ${i+1}: ${info.nom}\n${info.lineDate}\nEn dinars : ${hasRemise ? strike(d.ancienNet.toLocaleString()) + ' DZD ' : ''}${d.net.toLocaleString()} DZD`;
+                    texte += `\nEn Euro parallèle: ${hasRemise ? strike(d.eurNOld) + ' € ' : ''}${d.eurN} € | avec carte : ${hasRemise ? strike(d.eurOOld) + ' € ' : ''}${d.eurO} €`;
+                    texte += `\nEn dollars parallèle: ${hasRemise ? strike(d.usdNOld) + ' $ ' : ''}${d.usdN} $ | avec carte : ${hasRemise ? strike(d.usdOOld) + ' $ ' : ''}${d.usdO} $`;
                 });
             }
         }
+        
+        if (!dinarOnly) { texte += "\n\nnb: le parallèle c'est après la conversion du liquide en dinars"; }
+
         const el = document.createElement('textarea'); el.value = texte; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el);
-        const btn = document.getElementById('btnCopyMain'); const orig = btn.innerText; btn.innerText = "✅ Copié !"; setTimeout(() => btn.innerText = orig, 2000);
+        const btnId = dinarOnly ? 'btnCopyDinars' : 'btnCopyDetails';
+        const btn = document.getElementById(btnId); const orig = btn.innerText; btn.innerText = "✅ Copié !"; setTimeout(() => btn.innerText = orig, 2000);
     }
     
     function updateTitle() { document.getElementById('ch-form-title').innerText = `Détails chambre ${chambres.length + 1}`; }
     function toggleDiffDates() { document.getElementById('custom-dates-fields').style.display = document.getElementById('hasDiffDates').checked ? 'block' : 'none'; }
-    function closeM() { document.getElementById('resModal').style.display = 'none'; }
+    
+    function afficherTaux() {
+        const htmlTaux = `<div style="text-align: center;"><h3 style="color:#0056b3; margin-bottom:15px;">Taux de Change Actuels</h3><div class="block-yellow" style="text-align: left; font-size: 1.1em;"><strong style="color:#28a745;">EURO (€)</strong><br>• Marché Noir : <b>${euroBlack} DZD</b><br>• Officiel : <b>${euroOfficial} DZD</b><hr><strong style="color:#007bff;">DOLLAR ($)</strong><br>• Marché Noir : <b>${usdBlack} DZD</b><br>• Officiel : <b>${usdOfficial} DZD</b></div></div>`;
+        document.getElementById('resBody').innerHTML = htmlTaux;
+        document.getElementById('modalFooter').style.display = 'none';
+        document.getElementById('resModal').style.display = 'block';
+    }
+
+    function closeM() { 
+        document.getElementById('resModal').style.display = 'none'; 
+        document.getElementById('modalFooter').style.display = 'flex'; 
+    }
 </script>
 </body>
 </html>
