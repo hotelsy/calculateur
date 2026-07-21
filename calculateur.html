@@ -268,7 +268,6 @@
         html += `<div style="color:#28a745; font-weight:bold;">Euro Noir: <span class="eur-n">${data.eurN}</span> € | Officiel: <span class="eur-o">${data.eurO}</span> €</div>`;
         if (data.remiseP > 0) {
             html += `<div style="color:#777;">Ancien Euro Noir: <span class="eur-n-old">${data.eurNOld}</span> € | Ancien officiel: <span class="eur-o-old">${data.eurOOld}</span> €</div>`;
-            // Calcul de la différence négative pour l'euro
             let diffEurN = (data.eurN - data.eurNOld).toFixed(2);
             let diffEurO = (data.eurO - data.eurOOld).toFixed(2);
             html += `<div style="font-weight:bold; color:#ff0000;">Remise (${diffEurN} €) | Remise (${diffEurO} €)</div>`;
@@ -277,7 +276,6 @@
         html += `<div style="color:#28a745; font-weight:bold;">USD Noir: <span class="usd-n">${data.usdN}</span> $ | Officiel: <span class="usd-o">${data.usdO}</span> $</div>`;
         if (data.remiseP > 0) {
             html += `<div style="color:#777;">Ancien USD Noir: <span class="usd-n-old">${data.usdNOld}</span> $ | Ancien Officiel: <span class="usd-o-old">${data.usdOOld}</span> $</div>`;
-            // Calcul de la différence négative pour le dollar
             let diffUsdN = (data.usdN - data.usdNOld).toFixed(2);
             let diffUsdO = (data.usdO - data.usdOOld).toFixed(2);
             html += `<div style="font-weight:bold; color:#ff0000;">Remise (${diffUsdN} $) | Remise (${diffUsdO} $)</div>`;
@@ -286,15 +284,16 @@
         return html;
     }
 
-    function calculerData(ttcInitial, totalTaxeSpecifique) {
+    function calculerData(ttcInitial, totalTaxeSpecifique, totalDinerSpecifique = 0) {
         const remP = parseFloat(document.getElementById('remise').value) || 0;
         const timbreFunc = (v) => (document.getElementById('timbre').checked && v >= 300) ? Math.max(5, Math.round(v * (v > 100000 ? 0.02 : (v > 30000 ? 0.015 : 0.01)))) : 0;
         
         const ancienTimbre = timbreFunc(ttcInitial);
         const ancienNet = Math.round(ttcInitial + ancienTimbre);
         
-        const baseSoumiseARemise = ttcInitial - totalTaxeSpecifique;
-        const nouveauTTC = (baseSoumiseARemise * (1 - remP / 100)) + totalTaxeSpecifique;
+        // Exclure la taxe ET le dîner du montant soumis à la remise
+        const baseSoumiseARemise = ttcInitial - totalTaxeSpecifique - totalDinerSpecifique;
+        const nouveauTTC = (baseSoumiseARemise * (1 - remP / 100)) + totalTaxeSpecifique + totalDinerSpecifique;
         
         const nouveauTimbre = timbreFunc(nouveauTTC);
         const nouveauNet = Math.round(nouveauTTC + nouveauTimbre);
@@ -319,14 +318,16 @@
         currentChIndex = null;
         let totalTTCInitial = 0;
         let totalTaxeGeneral = 0;
+        let totalDinerGeneral = 0;
         
         chambres.forEach(c => {
             let info = getChInfo(c);
             totalTTCInitial += (PRIX[c.type] + (c.lits * PRIX.lit) + c.dinerPrix) * info.n;
             totalTaxeGeneral += (TAXES[c.type] || 0) * info.n;
+            totalDinerGeneral += (c.dinerPrix || 0) * info.n;
         });
         
-        const data = calculerData(totalTTCInitial, totalTaxeGeneral);
+        const data = calculerData(totalTTCInitial, totalTaxeGeneral, totalDinerGeneral);
         document.getElementById('resBody').innerHTML = genererHTMLResultat("Total Général", data);
         document.getElementById('resModal').style.display = 'block';
     }
@@ -348,7 +349,8 @@
         
         const ttcInitial = (PRIX[c.type] + (c.lits * PRIX.lit) + c.dinerPrix) * n;
         const totalTaxe = (TAXES[c.type] || 0) * n;
-        const dataCh = calculerData(ttcInitial, totalTaxe);
+        const totalDiner = (c.dinerPrix || 0) * n;
+        const dataCh = calculerData(ttcInitial, totalTaxe, totalDiner);
         
         return { nom: nomComplet, lineDate, dataCh, n };
     }
@@ -372,6 +374,7 @@
         else {
             let totalTTC = 0;
             let totalTaxeGeneral = 0;
+            let totalDinerGeneral = 0;
             let datesIdentiquesGénéral = true;
             let premièreDateGénéral = null;
             
@@ -379,11 +382,12 @@
                 const info = getChInfo(c);
                 totalTTC += (PRIX[c.type] + (c.lits * PRIX.lit) + c.dinerPrix) * info.n;
                 totalTaxeGeneral += (TAXES[c.type] || 0) * info.n;
+                totalDinerGeneral += (c.dinerPrix || 0) * info.n;
                 if (index === 0) premièreDateGénéral = info.lineDate;
                 else if (info.lineDate !== premièreDateGénéral) datesIdentiquesGénéral = false;
             });
 
-            const globalData = calculerData(totalTTC, totalTaxeGeneral);
+            const globalData = calculerData(totalTTC, totalTaxeGeneral, totalDinerGeneral);
             texte = "LE TOTAL :\n";
             texte += hasRemise ? `${strike(globalData.ancienNet.toLocaleString())} DZD ${globalData.net.toLocaleString()} DZD\n` : `${globalData.net.toLocaleString()} DZD\n`;
 
